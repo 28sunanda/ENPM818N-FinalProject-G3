@@ -48,12 +48,11 @@ jobs:
         env:
           ECR_URI: 038462756869.dkr.ecr.us-east-1.amazonaws.com/enpm818n-finalproject-g3
         run: |
-          SERVICES="accountingservice adservice cartservice checkoutservice currencyservice emailservice flagd frauddetectionservice frontend frontendproxy grafana imageprovider jaeger kafka loadgenerator otelcol paymentservice productcatalogservice prometheus-server quoteservice recommendationservice shippingservice valkey"
 
-          for SERVICE in $SERVICES; do
+          
             echo "Deploying $SERVICE"
-            kubectl apply -f kubernetes/${SERVICE}-deployment.yaml
+            kubectl apply -f kubernetes/Deployment/
 
             # Verify Deployment
-            kubectl rollout status deployment/${SERVICE} || kubectl rollout undo deployment/${SERVICE}
+            kubectl rollout status deployment/ || kubectl rollout undo deployment/
           done
