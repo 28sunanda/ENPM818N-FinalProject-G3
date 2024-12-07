@@ -43,16 +43,15 @@ jobs:
             docker push $IMAGE_URI
           done
 
-      # Step 5: Deploy to Kubernetes for Multiple Services
+     # Step 5: Deploy to Kubernetes for All Services
       - name: Deploy to Kubernetes
         env:
           ECR_URI: 038462756869.dkr.ecr.us-east-1.amazonaws.com/enpm818n-finalproject-g3
         run: |
+          # Apply all deployment files from the 'kubernetes/Deployment' folder
+          kubectl apply -f kubernetes/Deployment/
 
-          
-            echo "Deploying $SERVICE"
-            kubectl apply -f kubernetes/Deployment/
-
-            # Verify Deployment
-            kubectl rollout status deployment/ || kubectl rollout undo deployment/
-          done
+          # Verify Deployment
+          for SERVICE in $SERVICES; do
+            kubectl rollout status deployment/${SERVICE} || kubectl rollout undo deployment/${SERVICE}
+          done
