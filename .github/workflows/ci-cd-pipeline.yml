@@ -31,27 +31,24 @@ jobs:
           ECR_URI: 038462756869.dkr.ecr.us-east-1.amazonaws.com/enpm818n-finalproject-g3
         run: |
           SERVICES="accountingservice adservice cartservice checkoutservice currencyservice emailservice flagd frauddetectionservice frontend frontendproxy grafana imageprovider jaeger kafka loadgenerator otelcol paymentservice productcatalogservice prometheus-server quoteservice recommendationservice shippingservice valkey"
-
           for SERVICE in $SERVICES; do
             echo "Building and pushing $SERVICE"
             IMAGE_URI=${ECR_URI}/${SERVICE}:latest
-
             # Build the image
             docker build -t $IMAGE_URI ./${SERVICE}
-
             # Push the image
             docker push $IMAGE_URI
           done
 
-     # Step 5: Deploy to Kubernetes for All Services
+      # Step 5: Deploy to Kubernetes for All Services
       - name: Deploy to Kubernetes
         env:
-          ECR_URI: 038462756869.dkr.ecr.us-east-1.amazonaws.com/enpm818n-finalproject-g3
+          SERVICES="accountingservice adservice cartservice checkoutservice currencyservice emailservice flagd frauddetectionservice frontend frontendproxy grafana imageprovider jaeger kafka loadgenerator otelcol paymentservice productcatalogservice prometheus-server quoteservice recommendationservice shippingservice valkey"
         run: |
           # Apply all deployment files from the 'kubernetes/Deployment' folder
           kubectl apply -f kubernetes/Deployment/
-
-          # Verify Deployment
+          
+          # Verify Deployment for each service
           for SERVICE in $SERVICES; do
             kubectl rollout status deployment/${SERVICE} || kubectl rollout undo deployment/${SERVICE}
-          done
+          done
