@@ -1,53 +1,59 @@
-name: EKS Deployment Workflow
+name: CI/CD Pipeline
 
 on:
   push:
     branches:
       - main
 
-env:
-  AWS_REGION: us-east-1
-  ECR_REPOSITORY: enpm818n-finalproject-g3
-  CLUSTER_NAME: otel-demo-newcluster
-  DEPLOYMENT_NAME: otel-demo-deployment
-  CONTAINER_NAME: otel-demo-container
-  NAMESPACE: otel-demo
-
 jobs:
-  deploy:
-    name: Deploy to EKS
+  build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
-    # Step 1: Checkout the repository
-    - name: Checkout Code
-      uses: actions/checkout@v3
+      # Step 1: Checkout Code
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-    # Step 2: Configure AWS CLI
-    - name: Configure AWS CLI
-      run: |
-        aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws configure set region $AWS_REGION
+      # Step 2: Configure AWS Credentials
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1 
 
-    # Step 3: Authenticate to ECR
-    - name: Login to Amazon ECR
-      id: login-ecr
-      run: |
-        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com
+      # Step 3: Log in to Amazon ECR
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
 
-    # Step 4: Build and push Docker image
-    - name: Build and Push Docker Image
-      run: |
-        IMAGE_NAME=${ECR_REPOSITORY}
-        TAG=$(git rev-parse --short HEAD)
-        docker build -t $IMAGE_NAME:$TAG .
-        docker tag $IMAGE_NAME:$TAG ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_NAME:$TAG
-        docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_NAME:$TAG
+      # Step 4: Build, Tag, and Push Docker Images for Multiple Services
+      - name: Build and Push Images
+        env:
+          ECR_URI: 038462756869.dkr.ecr.us-east-1.amazonaws.com/enpm818n-finalproject-g3
+        run: |
+          SERVICES="accountingservice adservice cartservice checkoutservice currencyservice emailservice flagd frauddetectionservice frontend frontendproxy grafana imageprovider jaeger kafka loadgenerator otelcol paymentservice productcatalogservice prometheus-server quoteservice recommendationservice shippingservice valkey"
 
-    # Step 5: Update the Kubernetes deployment
-    - name: Deploy to EKS
-      run: |
-        aws eks update-kubeconfig --region $AWS_REGION --name $CLUSTER_NAME
-        kubectl set image deployment/$DEPLOYMENT_NAME $CONTAINER_NAME=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$TAG -n $NAMESPACE
-        kubectl rollout restart deployment/$DEPLOYMENT_NAME -n $NAMESPACE
+          for SERVICE in $SERVICES; do
+            echo "Building and pushing $SERVICE"
+            IMAGE_URI=${ECR_URI}/${SERVICE}:latest
+
+            # Build the image
+            docker build -t $IMAGE_URI ./${SERVICE}
+
+            # Push the image
+            docker push $IMAGE_URI
+          done
+
+      # Step 5: Deploy to Kubernetes for Multiple Services
+      - name: Deploy to Kubernetes
+        env:
+          ECR_URI: 038462756869.dkr.ecr.us-east-1.amazonaws.com/enpm818n-finalproject-g3
+        run: |
+          SERVICES="accountingservice adservice cartservice checkoutservice currencyservice emailservice flagd frauddetectionservice frontend frontendproxy grafana imageprovider jaeger kafka loadgenerator otelcol paymentservice productcatalogservice prometheus-server quoteservice recommendationservice shippingservice valkey"
+
+          for SERVICE in $SERVICES; do
+            echo "Deploying $SERVICE"
+            kubectl apply -f k8s/${SERVICE}-deployment.yaml
+
+            # Verify Deployment
+            kubectl rollout status deployment/${SERVICE} || kubectl rollout undo deployment/${SERVICE}
+          done
