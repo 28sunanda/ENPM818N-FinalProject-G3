@@ -52,7 +52,7 @@ jobs:
 
           for SERVICE in $SERVICES; do
             echo "Deploying $SERVICE"
-            kubectl apply -f k8s/${SERVICE}-deployment.yaml
+            kubectl apply -f kubernetes/${SERVICE}-deployment.yaml
 
             # Verify Deployment
             kubectl rollout status deployment/${SERVICE} || kubectl rollout undo deployment/${SERVICE}
